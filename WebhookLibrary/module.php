@@ -80,7 +80,7 @@ class WebhookLibrary extends IPSModule
                 $url = $hook['Hook'];
                 // Simple safety escaping
                 $displayText = htmlspecialchars($url);
-                $html .= "<li><a href=\"$url\">$displayText</a></li>";
+                $html .= "<li><a href=\"$url\" target=\"_blank\">$displayText</a></li>";
             }
         }
 
