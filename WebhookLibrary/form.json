@@ -1,0 +1,9 @@
+{
+    "elements": [
+        {
+            "type": "SelectInstance",
+            "name": "SecretsManagerID",
+            "caption": "Secrets Manager (Passkey Module)"
+        }
+    ]
+}

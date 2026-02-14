@@ -1,0 +1,12 @@
+{
+    "translations": {
+        "de": {
+            "Webhook Library": "Webhook Bibliothek",
+            "Secrets Manager (Passkey Module)": "Secrets Manager (Passkey Modul)"
+        },
+        "en": {
+            "Webhook Library": "Webhook Library",
+            "Secrets Manager (Passkey Module)": "Secrets Manager (Passkey Module)"
+        }
+    }
+}
