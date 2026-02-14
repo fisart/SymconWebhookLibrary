@@ -94,6 +94,12 @@ class WebhookLibrary extends IPSModule
         if (count($ids) > 0) {
             $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
             $found = false;
+
+            // Fix: Ensure $hooks is an array to prevent PHP errors
+            if (!is_array($hooks)) {
+                $hooks = [];
+            }
+
             foreach ($hooks as $index => $hook) {
                 if ($hook['Hook'] == $WebHook) {
                     if ($hook['TargetID'] == $this->InstanceID) {
