@@ -28,9 +28,64 @@ class WebhookLibrary extends IPSModule
         $this->RegisterHook('/hook/library');
     }
 
-    protected function ProcessHookData()
+    public function ProcessHookData()
     {
-        // Logic for handling the webhook will go here
+        // 1. Authentication (SecretsManager)
+        $instanceID = $this->ReadPropertyInteger('SecretsManagerID');
+
+        // Only check if an instance ID is configured
+        if ($instanceID > 0 && @IPS_InstanceExists($instanceID)) {
+            // Check if the SecretsManager function exists to prevent fatal errors
+            if (function_exists('SEC_IsPortalAuthenticated')) {
+                if (!SEC_IsPortalAuthenticated($instanceID)) {
+                    $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
+                    // Redirect to SecretsManager Login
+                    $loginUrl = "/hook/secrets_" . (string)$instanceID . "?portal=1&return=" . urlencode($currentUrl);
+                    header("Location: " . $loginUrl);
+                    return;
+                }
+            }
+        }
+
+        // 2. Retrieve Webhook List
+        // Core WebHook Control GUID: {015A6EB8-D6E5-4B93-B496-0A3F726A5434}
+        $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0A3F726A5434}");
+
+        if (count($ids) === 0) {
+            echo "Error: WebHook Control instance not found.";
+            return;
+        }
+
+        // Get the raw Hooks list from the Core Instance
+        $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
+
+        // 3. Generate HTML Output
+        $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
+        $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+        $html .= "<style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f4f9; }
+                    h2 { color: #333; }
+                    ul { list-style-type: none; padding: 0; }
+                    li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
+                    li:hover { background: #e9ecef; }
+                    a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
+                  </style>";
+        $html .= "</head><body>";
+        $html .= "<h2>Available Webhooks</h2>";
+        $html .= "<ul>";
+
+        // Loop through all hooks and create links
+        foreach ($hooks as $hook) {
+            $url = $hook['Hook'];
+            // Simple safety escaping
+            $displayText = htmlspecialchars($url);
+            $html .= "<li><a href=\"$url\">$displayText</a></li>";
+        }
+
+        $html .= "</ul></body></html>";
+
+        // 4. Send Output
+        echo $html;
     }
 
     private function RegisterHook($WebHook)
