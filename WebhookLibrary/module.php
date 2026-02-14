@@ -28,7 +28,7 @@ class WebhookLibrary extends IPSModule
         $this->RegisterHook('/hook/library');
     }
 
-    public function ProcessHookData()
+    protected function ProcessHookData()
     {
         // 1. Authentication (SecretsManager)
         $instanceID = $this->ReadPropertyInteger('SecretsManagerID');
@@ -48,8 +48,8 @@ class WebhookLibrary extends IPSModule
         }
 
         // 2. Retrieve Webhook List
-        // Core WebHook Control GUID: {015A6EB8-D6E5-4B93-B496-0A3F726A5434}
-        $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0A3F726A5434}");
+        // UPDATED GUID based on your system diagnostic
+        $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}");
 
         if (count($ids) === 0) {
             echo "Error: WebHook Control instance not found.";
@@ -75,11 +75,13 @@ class WebhookLibrary extends IPSModule
         $html .= "<ul>";
 
         // Loop through all hooks and create links
-        foreach ($hooks as $hook) {
-            $url = $hook['Hook'];
-            // Simple safety escaping
-            $displayText = htmlspecialchars($url);
-            $html .= "<li><a href=\"$url\">$displayText</a></li>";
+        if (is_array($hooks)) {
+            foreach ($hooks as $hook) {
+                $url = $hook['Hook'];
+                // Simple safety escaping
+                $displayText = htmlspecialchars($url);
+                $html .= "<li><a href=\"$url\">$displayText</a></li>";
+            }
         }
 
         $html .= "</ul></body></html>";
@@ -90,7 +92,9 @@ class WebhookLibrary extends IPSModule
 
     private function RegisterHook($WebHook)
     {
-        $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0A3F726A5434}");
+        // Correct GUID for your system
+        $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}");
+
         if (count($ids) > 0) {
             $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
             $found = false;
@@ -117,7 +121,7 @@ class WebhookLibrary extends IPSModule
             IPS_SetProperty($ids[0], "Hooks", json_encode($hooks));
             IPS_ApplyChanges($ids[0]);
         } else {
-            $this->LogMessage("Error: No WebHook Control Instance found!", KL_MESSAGE);
+            $this->LogMessage("Error: No WebHook Control Instance found!", KL_ERROR);
         }
     }
 }
