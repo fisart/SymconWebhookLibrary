@@ -95,9 +95,9 @@ class WebhookLibrary extends IPSModule
             $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
             $found = false;
 
-            // Fix: Ensure $hooks is an array to prevent PHP errors
             if (!is_array($hooks)) {
                 $hooks = [];
+                $this->LogMessage("Webhook list was empty/invalid. Creating new list.", KL_MESSAGE);
             }
 
             foreach ($hooks as $index => $hook) {
@@ -107,13 +107,17 @@ class WebhookLibrary extends IPSModule
                     }
                     $hooks[$index]['TargetID'] = $this->InstanceID;
                     $found = true;
+                    $this->LogMessage("Webhook '$WebHook' was taken over by this instance.", KL_MESSAGE);
                 }
             }
             if (!$found) {
                 $hooks[] = ["Hook" => $WebHook, "TargetID" => $this->InstanceID];
+                $this->LogMessage("Webhook '$WebHook' was successfully created.", KL_MESSAGE);
             }
             IPS_SetProperty($ids[0], "Hooks", json_encode($hooks));
             IPS_ApplyChanges($ids[0]);
+        } else {
+            $this->LogMessage("Error: No WebHook Control Instance found!", KL_MESSAGE);
         }
     }
 }
