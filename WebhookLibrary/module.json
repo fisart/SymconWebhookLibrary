@@ -1,0 +1,11 @@
+{
+    "id": "{76417267-56C2-4A5F-1D84-307D96BB3129}",
+    "name": "Webhook Library",
+    "type": 3,
+    "vendor": "",
+    "aliases": [],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "WHL"
+}
