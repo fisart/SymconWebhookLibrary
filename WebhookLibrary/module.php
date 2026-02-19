@@ -95,6 +95,8 @@ class WebhookLibrary extends IPSModule
         // Correct GUID for your system
         $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}");
 
+        // REMOVED: Auto-creation logic (Guideline 2.iv violation)
+
         if (count($ids) > 0) {
             $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
             $found = false;
@@ -121,7 +123,8 @@ class WebhookLibrary extends IPSModule
             IPS_SetProperty($ids[0], "Hooks", json_encode($hooks));
             IPS_ApplyChanges($ids[0]);
         } else {
-            $this->LogMessage("Error: No WebHook Control Instance found!", KL_ERROR);
+            // Log error instead of creating instance
+            $this->LogMessage("Error: WebHook Control Instance not found! Please check your Core Instances.", KL_ERROR);
         }
     }
 }
