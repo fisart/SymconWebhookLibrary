@@ -1,8 +1,3 @@
-Here is the exact German translation of the documentation.
-
-### File: `README.md`
-
-```markdown
 # Webhook Library
 
 ## 1. Wozu wird dies benötigt? (Das Problem)
@@ -93,7 +88,8 @@ Damit dieses Modul die biometrische Authentifizierung über den SecretsManager n
 - **Modul-Präfix:** `WHL`
 - **WebHook URL:** `/hook/library`
 - **Abhängigkeiten:** Benötigt `Secrets Manager` für die Authentifizierungslogik.
-```
+
+````
 
 I have prepared a comprehensive documentation file (`README.md`) that addresses all your points: the problem statement, the solution, the technical process, and usage instructions.
 
@@ -188,4 +184,4 @@ When a user accesses the library URL (e.g., `/hook/library`), the module follows
 - **Module Prefix:** `WHL`
 - **WebHook URL:** `/hook/library`
 - **Dependencies:** Requires `Secrets Manager` for authentication logic.
-```
+````
