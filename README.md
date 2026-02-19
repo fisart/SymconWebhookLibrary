@@ -95,10 +95,6 @@ Damit dieses Modul die biometrische Authentifizierung über den SecretsManager n
 - **Abhängigkeiten:** Benötigt `Secrets Manager` für die Authentifizierungslogik.
 ```
 
-I have prepared a comprehensive documentation file (`README.md`) that addresses all your points: the problem statement, the solution, the technical process, and usage instructions.
-
-You should place this content in the **root** of your repository (named `README.md`).
-
 ### File: `README.md`
 
 ```markdown
