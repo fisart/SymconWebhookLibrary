@@ -22,6 +22,20 @@ Das **Webhook Library** Modul löst dies, indem es automatisch eine dynamische H
 - **Ein-Klick-Zugriff:** Ein Klick auf einen Listeneintrag öffnet den entsprechenden Webhook in einem **neuen Browser-Tab** (`target="_blank"`).
 - **Sicherheitsintegration:** Nahtlose Integration mit dem "Secrets Manager" (Passkey Modul). Der Zugriff auf die Bibliothek ist nur authentifizierten Benutzern gestattet.
 
+Kurzbeschreibung der notwendigen Vorbereitungen im **Password Vault**, damit die Passkey-Funktionalität (Biometrie) für andere Module und Skripte zur Verfügung steht.
+
+### Voraussetzungen für die Passkey-Nutzung
+
+Damit dieses Modul die biometrische Authentifizierung über den Password Vault nutzen kann, müssen folgende Vorbereitungen im Tresor getroffen sein:
+
+1.  **Sichere Verbindung (HTTPS):** Passkeys funktionieren technisch nur über eine verschlüsselte Verbindung (z. B. IP-Symcon Connect oder ein gültiges SSL-Zertifikat).
+2.  **Registrierungs-Passwort:** Im Password Vault muss auf der obersten Ebene (**root**) ein Record mit dem exakten Namen `RegistrationPassword` erstellt werden. Dieser muss ein Feld namens `PW` mit einem frei wählbaren Passwort enthalten.
+3.  **Geräte-Registrierung:** Jedes Endgerät (Smartphone, Tablet oder PC) muss einmalig verknüpft werden. Rufen Sie dazu die Registrierungs-URL Ihrer Password Vault-Instanz auf:
+    `https://[Ihre-Symcon-URL]/hook/secrets_[ID]?register=1&pass=[Ihr-Passwort]`
+4.  **WebHook-Aktivität:** Der WebHook des Password Vault muss aktiv sein (in Version 3.0 automatisch für alle Modi der Fall).
+
+Der Secrets Manager ist im Modul Store von Symcon unter Password Vault zu finden
+
 ---
 
 ## 3. Der Prozess (Wie es funktioniert)
@@ -30,7 +44,7 @@ Wenn ein Benutzer die Bibliotheks-URL aufruft (z.B. `/hook/library`), folgt das 
 
 1.  **Eingehende Anfrage:** Das Modul empfängt die HTTP-Anfrage über seinen eigenen registrierten Hook.
 2.  **Authentifizierungsprüfung:**
-    - Das Modul prüft die konfigurierte `SecretsManagerID`.
+    - Das Modul prüft die konfigurierte `Password VaultID`.
     - Es ruft `SEC_IsPortalAuthenticated($instanceID)` auf, um die Sitzung des Benutzers zu verifizieren.
     - **Falls nicht autorisiert:** Der Benutzer wird zum Secrets Manager Login-Portal weitergeleitet.
     - **Falls autorisiert:** Der Prozess wird fortgesetzt.
@@ -51,17 +65,17 @@ Wenn ein Benutzer die Bibliotheks-URL aufruft (z.B. `/hook/library`), folgt das 
 - IP-Symcon 6.0 oder höher.
 - Das **Secrets Manager** (Passkey) Modul muss installiert und konfiguriert sein.
 
-Kurzbeschreibung der notwendigen Vorbereitungen im **SecretsManager**, damit die Passkey-Funktionalität (Biometrie) für andere Module und Skripte zur Verfügung steht.
+Kurzbeschreibung der notwendigen Vorbereitungen im **Password Vault**, damit die Passkey-Funktionalität (Biometrie) für andere Module und Skripte zur Verfügung steht.
 
 ### Voraussetzungen für die Passkey-Nutzung
 
-Damit dieses Modul die biometrische Authentifizierung über den SecretsManager nutzen kann, müssen folgende Vorbereitungen im Tresor getroffen sein:
+Damit dieses Modul die biometrische Authentifizierung über den Password Vault nutzen kann, müssen folgende Vorbereitungen im Tresor getroffen sein:
 
 1.  **Sichere Verbindung (HTTPS):** Passkeys funktionieren technisch nur über eine verschlüsselte Verbindung (z. B. IP-Symcon Connect oder ein gültiges SSL-Zertifikat).
-2.  **Registrierungs-Passwort:** Im SecretsManager muss auf der obersten Ebene (**root**) ein Record mit dem exakten Namen `RegistrationPassword` erstellt werden. Dieser muss ein Feld namens `PW` mit einem frei wählbaren Passwort enthalten.
-3.  **Geräte-Registrierung:** Jedes Endgerät (Smartphone, Tablet oder PC) muss einmalig verknüpft werden. Rufen Sie dazu die Registrierungs-URL Ihrer SecretsManager-Instanz auf:
+2.  **Registrierungs-Passwort:** Im Password Vault muss auf der obersten Ebene (**root**) ein Record mit dem exakten Namen `RegistrationPassword` erstellt werden. Dieser muss ein Feld namens `PW` mit einem frei wählbaren Passwort enthalten.
+3.  **Geräte-Registrierung:** Jedes Endgerät (Smartphone, Tablet oder PC) muss einmalig verknüpft werden. Rufen Sie dazu die Registrierungs-URL Ihrer Password Vault-Instanz auf:
     `https://[Ihre-Symcon-URL]/hook/secrets_[ID]?register=1&pass=[Ihr-Passwort]`
-4.  **WebHook-Aktivität:** Der WebHook des SecretsManager muss aktiv sein (in Version 3.0 automatisch für alle Modi der Fall).
+4.  **WebHook-Aktivität:** Der WebHook des Password Vault muss aktiv sein (in Version 3.0 automatisch für alle Modi der Fall).
 
 ---
 
@@ -87,14 +101,7 @@ Damit dieses Modul die biometrische Authentifizierung über den SecretsManager n
 
 - **Modul-Präfix:** `WHL`
 - **WebHook URL:** `/hook/library`
-- **Abhängigkeiten:** Benötigt `Secrets Manager` für die Authentifizierungslogik.
-
-````
-
-### File: `README.md`
-
-```markdown
-# Webhook Library
+- **Abhängigkeiten:** Benötigt `Password Vault` für die Authentifizierungslogik.
 
 ## 1. Why do you need this? (The Problem)
 
@@ -116,17 +123,17 @@ The **Webhook Library** module solves this by automatically generating a dynamic
 - **Auto-Discovery:** Automatically reads the configuration of the local IP-Symcon WebHook Control instance.
 - **Dynamic Listing:** Generates a clean, responsive HTML list of all available hooks.
 - **One-Click Access:** Clicking a list item opens the respective Webhook in a **new browser tab** (`target="_blank"`).
-- **Security Integration:** Seamlessly integrates with the "Secrets Manager" (Passkey Module). Access to the library is restricted to authenticated users only.
+- **Security Integration:** Seamlessly integrates with the "Password Vault" (Passkey Module). Access to the library is restricted to authenticated users only.
 
 ### Prerequisites for Passkey Usage
 
-To allow this module to utilize biometric authentication via the SecretsManager, the following preparations must be completed within the vault:
+To allow this module to utilize biometric authentication via the Password Vault, the following preparations must be completed within the vault:
 
 1.  **Secure Connection (HTTPS):** Passkeys strictly require an encrypted connection (e.g., IP-Symcon Connect or a valid SSL certificate) to function.
 2.  **Registration Password:** A record named exactly `RegistrationPassword` must be created at the vault's **root** level. This record must contain a field named `PW` with a password of your choice.
-3.  **Device Enrollment:** Each end device (smartphone, tablet, or PC) must be linked once. To do this, navigate to the registration URL of your SecretsManager instance:
+3.  **Device Enrollment:** Each end device (smartphone, tablet, or PC) must be linked once. To do this, navigate to the registration URL of your Password Vault instance:
     `https://[Your-Symcon-URL]/hook/secrets_[ID]?register=1&pass=[Your-Password]`
-4.  **WebHook Status:** The SecretsManager WebHook must be active (enabled automatically for all modes in version 3.0+).
+4.  **WebHook Status:** The Password Vault WebHook must be active (enabled automatically for all modes in version 3.0+).
 
 ---
 
@@ -136,7 +143,7 @@ When a user accesses the library URL (e.g., `/hook/library`), the module follows
 
 1.  **Incoming Request:** The module receives the HTTP request via its own registered hook.
 2.  **Authentication Check:**
-    - The module checks the configured `SecretsManagerID`.
+    - The module checks the configured `Password VaultID`.
     - It calls `SEC_IsPortalAuthenticated($instanceID)` to verify the user's session.
     - **If unauthorized:** The user is redirected to the Secrets Manager login portal.
     - **If authorized:** The process continues.
@@ -179,5 +186,8 @@ When a user accesses the library URL (e.g., `/hook/library`), the module follows
 
 - **Module Prefix:** `WHL`
 - **WebHook URL:** `/hook/library`
-- **Dependencies:** Requires `Secrets Manager` for authentication logic.
-````
+- **Dependencies:** Requires `Password Vault` for authentication logic.
+
+```
+
+```
