@@ -37,7 +37,7 @@ class WebhookLibrary extends IPSModule
             if (function_exists('SEC_IsPortalAuthenticated')) {
                 if (!SEC_IsPortalAuthenticated($instanceID)) {
                     $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
-                    $loginUrl = "/hook/secrets_" . (string)$instanceID . "?portal=1&return=" . urlencode($currentUrl);
+                    $loginUrl = '/hook/secrets_' . (string)$instanceID . '?portal=1&return=' . urlencode($currentUrl);
                     header('Location: ' . $loginUrl);
                     return;
                 }
@@ -53,58 +53,85 @@ class WebhookLibrary extends IPSModule
 
         $webHookControlID = $ids[0];
 
-        // 3. Read complete configuration so we can also detect internal hooks
-        $configRaw = IPS_GetConfiguration($webHookControlID);
-        $config = json_decode($configRaw, true);
+        // 3. Read the configuration form, because the internal hooks are shown there
+        $formRaw = IPS_GetConfigurationForm($webHookControlID);
+        $form = json_decode($formRaw, true);
 
-        if (!is_array($config)) {
-            echo 'Error: Could not read WebHook Control configuration.';
+        if (!is_array($form)) {
+            echo 'Error: Could not read WebHook Control configuration form.';
             return;
         }
 
         $userHooks = [];
         $internalHooks = [];
 
-        foreach ($config as $propertyName => $propertyValue) {
-            if (!is_array($propertyValue)) {
-                continue;
+        $scanNode = function ($node, $path = '') use (&$scanNode, &$userHooks, &$internalHooks) {
+            if (!is_array($node)) {
+                return;
             }
 
-            foreach ($propertyValue as $row) {
-                if (!is_array($row)) {
-                    continue;
+            // Detect lists that directly contain rows in "values"
+            if (isset($node['values']) && is_array($node['values'])) {
+                $hasHookRows = false;
+
+                foreach ($node['values'] as $row) {
+                    if (is_array($row) && isset($row['Hook']) && is_string($row['Hook']) && trim($row['Hook']) !== '') {
+                        $hasHookRows = true;
+                        break;
+                    }
                 }
 
-                if (!isset($row['Hook']) || !is_string($row['Hook'])) {
-                    continue;
-                }
+                if ($hasHookRows) {
+                    $isInternalSection = false;
 
-                $hook = trim($row['Hook']);
-                if ($hook === '') {
-                    continue;
-                }
+                    $caption = isset($node['caption']) && is_string($node['caption']) ? $node['caption'] : '';
+                    $name    = isset($node['name']) && is_string($node['name']) ? $node['name'] : '';
 
-                $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
+                    if (stripos($caption, 'internal') !== false || stripos($name, 'internal') !== false || stripos($path, 'internal') !== false) {
+                        $isInternalSection = true;
+                    }
 
-                $entry = [
-                    'url'   => $url,
-                    'hook'  => $hook,
-                    'row'   => $row,
-                    'source' => (string)$propertyName
-                ];
+                    foreach ($node['values'] as $row) {
+                        if (!is_array($row) || !isset($row['Hook']) || !is_string($row['Hook'])) {
+                            continue;
+                        }
 
-                if (stripos((string)$propertyName, 'internal') !== false) {
-                    $internalHooks[$url] = $entry;
-                } else {
-                    $userHooks[$url] = $entry;
+                        $hook = trim($row['Hook']);
+                        if ($hook === '') {
+                            continue;
+                        }
+
+                        $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
+
+                        $entry = [
+                            'url' => $url,
+                            'hook' => $hook,
+                            'row' => $row
+                        ];
+
+                        if ($isInternalSection) {
+                            $internalHooks[$url] = $entry;
+                        } else {
+                            $userHooks[$url] = $entry;
+                        }
+                    }
                 }
             }
-        }
+
+            // Recurse through all children
+            foreach ($node as $key => $value) {
+                if (is_array($value)) {
+                    $scanNode($value, $path . '/' . (string)$key);
+                }
+            }
+        };
+
+        $scanNode($form);
 
         ksort($userHooks, SORT_NATURAL | SORT_FLAG_CASE);
         ksort($internalHooks, SORT_NATURAL | SORT_FLAG_CASE);
 
-        // 4. Generate HTML
+        // 4. Generate HTML Output
         $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
         $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
         $html .= "<style>
@@ -120,7 +147,6 @@ class WebhookLibrary extends IPSModule
         $html .= "</head><body>";
         $html .= "<h2>Available Links</h2>";
 
-        // Internal hooks
         $html .= "<h3>Internal WebHooks</h3>";
         if (count($internalHooks) === 0) {
             $html .= "<div class='empty'>No internal hooks found.</div>";
@@ -128,23 +154,11 @@ class WebhookLibrary extends IPSModule
             $html .= "<ul>";
             foreach ($internalHooks as $entry) {
                 $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
-
-                $label = $entry['url'];
-                if (isset($entry['row']['InstanceID']) && @IPS_ObjectExists((int)$entry['row']['InstanceID'])) {
-                    $label = IPS_GetName((int)$entry['row']['InstanceID']) . ' - ' . $entry['url'];
-                }
-
-                $escapedLabel = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
-
-                $html .= "<li>";
-                $html .= "<a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedLabel . "</a>";
-                $html .= "<span class='sub'>" . $escapedUrl . "</span>";
-                $html .= "</li>";
+                $html .= "<li><a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedUrl . "</a></li>";
             }
             $html .= "</ul>";
         }
 
-        // User hooks
         $html .= "<h3>Registered WebHooks</h3>";
         if (count($userHooks) === 0) {
             $html .= "<div class='empty'>No registered webhooks found.</div>";
