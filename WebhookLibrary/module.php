@@ -33,13 +33,10 @@ class WebhookLibrary extends IPSModule
         // 1. Authentication (SecretsManager)
         $instanceID = $this->ReadPropertyInteger('SecretsManagerID');
 
-        // Only check if an instance ID is configured
         if ($instanceID > 0 && @IPS_InstanceExists($instanceID)) {
-            // Check if the SecretsManager function exists to prevent fatal errors
             if (function_exists('SEC_IsPortalAuthenticated')) {
                 if (!SEC_IsPortalAuthenticated($instanceID)) {
                     $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
-                    // Redirect to SecretsManager Login
                     $loginUrl = "/hook/secrets_" . (string)$instanceID . "?portal=1&return=" . urlencode($currentUrl);
                     header("Location: " . $loginUrl);
                     return;
@@ -55,36 +52,32 @@ class WebhookLibrary extends IPSModule
             return;
         }
 
-        // Registered hooks from WebHook Control
         $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
         if (!is_array($hooks)) {
             $hooks = [];
         }
 
-        // 2a. Add Symcon internal web server endpoints manually
-        // These are not part of the Hooks property
-        $internalLinks = [
-            '/api/',
-            '/hook/',
-            '/user/'
-        ];
-
-        // Build combined unique list
+        // 3. Build unique sorted list of real hooks only
         $allLinks = [];
 
-        foreach ($internalLinks as $internalLink) {
-            $allLinks[$internalLink] = $internalLink;
-        }
-
         foreach ($hooks as $hook) {
-            if (isset($hook['Hook']) && is_string($hook['Hook']) && $hook['Hook'] !== '') {
-                $allLinks[$hook['Hook']] = $hook['Hook'];
+            if (!isset($hook['Hook']) || !is_string($hook['Hook']) || $hook['Hook'] === '') {
+                continue;
             }
+
+            $url = trim($hook['Hook']);
+
+            // Only keep concrete webhook paths
+            if (strpos($url, '/hook/') !== 0) {
+                continue;
+            }
+
+            $allLinks[$url] = $url;
         }
 
         ksort($allLinks, SORT_NATURAL | SORT_FLAG_CASE);
 
-        // 3. Generate HTML Output
+        // 4. Generate HTML Output
         $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
         $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
         $html .= "<style>
@@ -96,7 +89,7 @@ class WebhookLibrary extends IPSModule
                 a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
               </style>";
         $html .= "</head><body>";
-        $html .= "<h2>Available Webhooks / Internal Endpoints</h2>";
+        $html .= "<h2>Available Webhooks</h2>";
         $html .= "<ul>";
 
         foreach ($allLinks as $url) {
@@ -106,7 +99,6 @@ class WebhookLibrary extends IPSModule
 
         $html .= "</ul></body></html>";
 
-        // 4. Send Output
         echo $html;
     }
 
