@@ -38,72 +38,73 @@ class WebhookLibrary extends IPSModule
                 if (!SEC_IsPortalAuthenticated($instanceID)) {
                     $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
                     $loginUrl = "/hook/secrets_" . (string)$instanceID . "?portal=1&return=" . urlencode($currentUrl);
-                    header("Location: " . $loginUrl);
+                    header('Location: ' . $loginUrl);
                     return;
                 }
             }
         }
 
-        // 2. Collect registered webhooks
-        $webhookLinks = [];
-        $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}");
+        // 2. Retrieve WebHook Control instance
+        $ids = IPS_GetInstanceListByModuleID('{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}');
+        if (count($ids) === 0) {
+            echo 'Error: WebHook Control instance not found.';
+            return;
+        }
 
-        if (count($ids) > 0) {
-            $hooks = json_decode(IPS_GetProperty($ids[0], 'Hooks'), true);
-            if (is_array($hooks)) {
-                foreach ($hooks as $hook) {
-                    if (!isset($hook['Hook']) || !is_string($hook['Hook'])) {
-                        continue;
-                    }
+        $webHookControlID = $ids[0];
 
-                    $url = trim($hook['Hook']);
-                    if ($url === '') {
-                        continue;
-                    }
+        // 3. Read complete configuration so we can also detect internal hooks
+        $configRaw = IPS_GetConfiguration($webHookControlID);
+        $config = json_decode($configRaw, true);
 
-                    $webhookLinks[$url] = [
-                        'url'   => $url,
-                        'label' => $url
-                    ];
+        if (!is_array($config)) {
+            echo 'Error: Could not read WebHook Control configuration.';
+            return;
+        }
+
+        $userHooks = [];
+        $internalHooks = [];
+
+        foreach ($config as $propertyName => $propertyValue) {
+            if (!is_array($propertyValue)) {
+                continue;
+            }
+
+            foreach ($propertyValue as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+
+                if (!isset($row['Hook']) || !is_string($row['Hook'])) {
+                    continue;
+                }
+
+                $hook = trim($row['Hook']);
+                if ($hook === '') {
+                    continue;
+                }
+
+                $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
+
+                $entry = [
+                    'url'   => $url,
+                    'hook'  => $hook,
+                    'row'   => $row,
+                    'source' => (string)$propertyName
+                ];
+
+                if (stripos((string)$propertyName, 'internal') !== false) {
+                    $internalHooks[$url] = $entry;
+                } else {
+                    $userHooks[$url] = $entry;
                 }
             }
         }
 
-        ksort($webhookLinks, SORT_NATURAL | SORT_FLAG_CASE);
+        ksort($userHooks, SORT_NATURAL | SORT_FLAG_CASE);
+        ksort($internalHooks, SORT_NATURAL | SORT_FLAG_CASE);
 
-        // 3. Collect internal WebFront links
-        // Symcon WebFronts can be addressed via /#<WebFrontID>
-        $webfrontLinks = [];
-
-        foreach (IPS_GetInstanceList() as $id) {
-            $instance = @IPS_GetInstance($id);
-            if (!is_array($instance) || !isset($instance['ModuleInfo']['ModuleName'])) {
-                continue;
-            }
-
-            $moduleName = (string)$instance['ModuleInfo']['ModuleName'];
-
-            // Detect WebFront-like modules
-            if (stripos($moduleName, 'WebFront') === false) {
-                continue;
-            }
-
-            $object = @IPS_GetObject($id);
-            $name   = is_array($object) && isset($object['ObjectName']) && $object['ObjectName'] !== ''
-                ? $object['ObjectName']
-                : ('WebFront ' . $id);
-
-            $url = '/#' . $id;
-
-            $webfrontLinks[$url] = [
-                'url'   => $url,
-                'label' => $name . ' (#' . $id . ')'
-            ];
-        }
-
-        ksort($webfrontLinks, SORT_NATURAL | SORT_FLAG_CASE);
-
-        // 4. Generate HTML Output
+        // 4. Generate HTML
         $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
         $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
         $html .= "<style>
@@ -112,35 +113,44 @@ class WebhookLibrary extends IPSModule
                 ul { list-style-type: none; padding: 0; }
                 li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
                 li:hover { background: #e9ecef; }
-                a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
+                a { display: block; padding: 15px 15px 4px 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
                 .sub { display: block; padding: 0 15px 15px 15px; color: #666; font-size: 12px; font-weight: normal; }
                 .empty { color: #666; font-style: italic; margin-bottom: 20px; }
               </style>";
         $html .= "</head><body>";
         $html .= "<h2>Available Links</h2>";
 
-        // WebFront section
-        $html .= "<h3>Internal WebFront Links</h3>";
-        if (count($webfrontLinks) === 0) {
-            $html .= "<div class='empty'>No WebFront instances found.</div>";
+        // Internal hooks
+        $html .= "<h3>Internal WebHooks</h3>";
+        if (count($internalHooks) === 0) {
+            $html .= "<div class='empty'>No internal hooks found.</div>";
         } else {
             $html .= "<ul>";
-            foreach ($webfrontLinks as $entry) {
-                $escapedUrl   = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
-                $escapedLabel = htmlspecialchars($entry['label'], ENT_QUOTES, 'UTF-8');
-                $html .= "<li><a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedLabel . "</a>";
-                $html .= "<span class='sub'>" . $escapedUrl . "</span></li>";
+            foreach ($internalHooks as $entry) {
+                $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
+
+                $label = $entry['url'];
+                if (isset($entry['row']['InstanceID']) && @IPS_ObjectExists((int)$entry['row']['InstanceID'])) {
+                    $label = IPS_GetName((int)$entry['row']['InstanceID']) . ' - ' . $entry['url'];
+                }
+
+                $escapedLabel = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+
+                $html .= "<li>";
+                $html .= "<a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedLabel . "</a>";
+                $html .= "<span class='sub'>" . $escapedUrl . "</span>";
+                $html .= "</li>";
             }
             $html .= "</ul>";
         }
 
-        // WebHook section
+        // User hooks
         $html .= "<h3>Registered WebHooks</h3>";
-        if (count($webhookLinks) === 0) {
+        if (count($userHooks) === 0) {
             $html .= "<div class='empty'>No registered webhooks found.</div>";
         } else {
             $html .= "<ul>";
-            foreach ($webhookLinks as $entry) {
+            foreach ($userHooks as $entry) {
                 $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
                 $html .= "<li><a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedUrl . "</a></li>";
             }
