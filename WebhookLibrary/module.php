@@ -48,7 +48,6 @@ class WebhookLibrary extends IPSModule
         }
 
         // 2. Retrieve Webhook List
-        // UPDATED GUID based on your system diagnostic
         $ids = IPS_GetInstanceListByModuleID("{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}");
 
         if (count($ids) === 0) {
@@ -56,32 +55,53 @@ class WebhookLibrary extends IPSModule
             return;
         }
 
-        // Get the raw Hooks list from the Core Instance
+        // Registered hooks from WebHook Control
         $hooks = json_decode(IPS_GetProperty($ids[0], "Hooks"), true);
+        if (!is_array($hooks)) {
+            $hooks = [];
+        }
+
+        // 2a. Add Symcon internal web server endpoints manually
+        // These are not part of the Hooks property
+        $internalLinks = [
+            '/api/',
+            '/hook/',
+            '/user/'
+        ];
+
+        // Build combined unique list
+        $allLinks = [];
+
+        foreach ($internalLinks as $internalLink) {
+            $allLinks[$internalLink] = $internalLink;
+        }
+
+        foreach ($hooks as $hook) {
+            if (isset($hook['Hook']) && is_string($hook['Hook']) && $hook['Hook'] !== '') {
+                $allLinks[$hook['Hook']] = $hook['Hook'];
+            }
+        }
+
+        ksort($allLinks, SORT_NATURAL | SORT_FLAG_CASE);
 
         // 3. Generate HTML Output
         $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
         $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
         $html .= "<style>
-                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f4f9; }
-                    h2 { color: #333; }
-                    ul { list-style-type: none; padding: 0; }
-                    li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
-                    li:hover { background: #e9ecef; }
-                    a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
-                  </style>";
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f4f9; }
+                h2 { color: #333; }
+                ul { list-style-type: none; padding: 0; }
+                li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
+                li:hover { background: #e9ecef; }
+                a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
+              </style>";
         $html .= "</head><body>";
-        $html .= "<h2>Available Webhooks</h2>";
+        $html .= "<h2>Available Webhooks / Internal Endpoints</h2>";
         $html .= "<ul>";
 
-        // Loop through all hooks and create links
-        if (is_array($hooks)) {
-            foreach ($hooks as $hook) {
-                $url = $hook['Hook'];
-                // Simple safety escaping
-                $displayText = htmlspecialchars($url);
-                $html .= "<li><a href=\"$url\" target=\"_blank\">$displayText</a></li>";
-            }
+        foreach ($allLinks as $url) {
+            $escapedUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+            $html .= "<li><a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedUrl . "</a></li>";
         }
 
         $html .= "</ul></body></html>";
