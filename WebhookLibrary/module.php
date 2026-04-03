@@ -10,6 +10,8 @@ class WebhookLibrary extends IPSModule
         parent::Create();
 
         // Properties
+        // Properties
+        $this->RegisterPropertyBoolean('UsePasswordProtection', false);
         $this->RegisterPropertyInteger('SecretsManagerID', 0);
     }
 
@@ -30,17 +32,26 @@ class WebhookLibrary extends IPSModule
 
     protected function ProcessHookData()
     {
-        // 1. Authentication (SecretsManager)
+        // 1. Optional Authentication (SecretsManager)
+        $usePasswordProtection = $this->ReadPropertyBoolean('UsePasswordProtection');
         $instanceID = $this->ReadPropertyInteger('SecretsManagerID');
 
-        if ($instanceID > 0 && @IPS_InstanceExists($instanceID)) {
-            if (function_exists('SEC_IsPortalAuthenticated')) {
-                if (!SEC_IsPortalAuthenticated($instanceID)) {
-                    $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
-                    $loginUrl = '/hook/secrets_' . (string)$instanceID . '?portal=1&return=' . urlencode($currentUrl);
-                    header('Location: ' . $loginUrl);
+        if ($usePasswordProtection) {
+            if ($instanceID > 0 && @IPS_InstanceExists($instanceID)) {
+                if (function_exists('SEC_IsPortalAuthenticated')) {
+                    if (!SEC_IsPortalAuthenticated($instanceID)) {
+                        $currentUrl = $_SERVER['REQUEST_URI'] ?? '';
+                        $loginUrl = '/hook/secrets_' . (string)$instanceID . '?portal=1&return=' . urlencode($currentUrl);
+                        header('Location: ' . $loginUrl);
+                        return;
+                    }
+                } else {
+                    echo 'Error: Password protection is enabled, but the Secrets Manager function SEC_IsPortalAuthenticated is not available.';
                     return;
                 }
+            } else {
+                echo 'Error: Password protection is enabled, but no valid Secrets Manager instance is configured.';
+                return;
             }
         }
 

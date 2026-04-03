@@ -1,6 +1,11 @@
 {
     "elements": [
         {
+            "type": "CheckBox",
+            "name": "UsePasswordProtection",
+            "caption": "Enable password protection via Secrets Manager"
+        },
+        {
             "type": "SelectInstance",
             "name": "SecretsManagerID",
             "caption": "Secrets Manager (Passkey Module)"
