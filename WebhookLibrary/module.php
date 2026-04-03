@@ -53,85 +53,86 @@ class WebhookLibrary extends IPSModule
 
         $webHookControlID = $ids[0];
 
-        // 3. Read the configuration form, because the internal hooks are shown there
+        // 3. Read normal user-defined hooks from the real Hooks property
+        $userHooks = [];
+        $hooksRaw = IPS_GetProperty($webHookControlID, 'Hooks');
+        $hooks = json_decode($hooksRaw, true);
+
+        if (is_array($hooks)) {
+            foreach ($hooks as $row) {
+                if (!is_array($row) || !isset($row['Hook']) || !is_string($row['Hook'])) {
+                    continue;
+                }
+
+                $hook = trim($row['Hook']);
+                if ($hook === '') {
+                    continue;
+                }
+
+                $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
+                $userHooks[$url] = [
+                    'url' => $url,
+                    'hook' => $hook,
+                    'row' => $row
+                ];
+            }
+        }
+
+        // 4. Read internal hooks from the configuration form
+        $internalHooks = [];
         $formRaw = IPS_GetConfigurationForm($webHookControlID);
         $form = json_decode($formRaw, true);
 
-        if (!is_array($form)) {
-            echo 'Error: Could not read WebHook Control configuration form.';
-            return;
+        if (is_array($form)) {
+            $scanNode = function ($node, $path = '') use (&$scanNode, &$internalHooks) {
+                if (!is_array($node)) {
+                    return;
+                }
+
+                if (isset($node['values']) && is_array($node['values'])) {
+                    $caption = isset($node['caption']) && is_string($node['caption']) ? $node['caption'] : '';
+                    $name = isset($node['name']) && is_string($node['name']) ? $node['name'] : '';
+
+                    $isInternalSection =
+                        (stripos($caption, 'internal') !== false) ||
+                        (stripos($name, 'internal') !== false) ||
+                        (stripos($path, 'internal') !== false);
+
+                    if ($isInternalSection) {
+                        foreach ($node['values'] as $row) {
+                            if (!is_array($row) || !isset($row['Hook']) || !is_string($row['Hook'])) {
+                                continue;
+                            }
+
+                            $hook = trim($row['Hook']);
+                            if ($hook === '') {
+                                continue;
+                            }
+
+                            $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
+                            $internalHooks[$url] = [
+                                'url' => $url,
+                                'hook' => $hook,
+                                'row' => $row
+                            ];
+                        }
+                    }
+                }
+
+                foreach ($node as $key => $value) {
+                    if (is_array($value)) {
+                        $scanNode($value, $path . '/' . (string)$key);
+                    }
+                }
+            };
+
+            $scanNode($form);
         }
 
-        $userHooks = [];
-        $internalHooks = [];
-
-        $scanNode = function ($node, $path = '') use (&$scanNode, &$userHooks, &$internalHooks) {
-            if (!is_array($node)) {
-                return;
-            }
-
-            // Detect lists that directly contain rows in "values"
-            if (isset($node['values']) && is_array($node['values'])) {
-                $hasHookRows = false;
-
-                foreach ($node['values'] as $row) {
-                    if (is_array($row) && isset($row['Hook']) && is_string($row['Hook']) && trim($row['Hook']) !== '') {
-                        $hasHookRows = true;
-                        break;
-                    }
-                }
-
-                if ($hasHookRows) {
-                    $isInternalSection = false;
-
-                    $caption = isset($node['caption']) && is_string($node['caption']) ? $node['caption'] : '';
-                    $name    = isset($node['name']) && is_string($node['name']) ? $node['name'] : '';
-
-                    if (stripos($caption, 'internal') !== false || stripos($name, 'internal') !== false || stripos($path, 'internal') !== false) {
-                        $isInternalSection = true;
-                    }
-
-                    foreach ($node['values'] as $row) {
-                        if (!is_array($row) || !isset($row['Hook']) || !is_string($row['Hook'])) {
-                            continue;
-                        }
-
-                        $hook = trim($row['Hook']);
-                        if ($hook === '') {
-                            continue;
-                        }
-
-                        $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
-
-                        $entry = [
-                            'url' => $url,
-                            'hook' => $hook,
-                            'row' => $row
-                        ];
-
-                        if ($isInternalSection) {
-                            $internalHooks[$url] = $entry;
-                        } else {
-                            $userHooks[$url] = $entry;
-                        }
-                    }
-                }
-            }
-
-            // Recurse through all children
-            foreach ($node as $key => $value) {
-                if (is_array($value)) {
-                    $scanNode($value, $path . '/' . (string)$key);
-                }
-            }
-        };
-
-        $scanNode($form);
-
-        ksort($userHooks, SORT_NATURAL | SORT_FLAG_CASE);
         ksort($internalHooks, SORT_NATURAL | SORT_FLAG_CASE);
+        ksort($userHooks, SORT_NATURAL | SORT_FLAG_CASE);
 
-        // 4. Generate HTML Output
+        // 5. Generate HTML Output
         $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
         $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
         $html .= "<style>
@@ -140,8 +141,7 @@ class WebhookLibrary extends IPSModule
                 ul { list-style-type: none; padding: 0; }
                 li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
                 li:hover { background: #e9ecef; }
-                a { display: block; padding: 15px 15px 4px 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
-                .sub { display: block; padding: 0 15px 15px 15px; color: #666; font-size: 12px; font-weight: normal; }
+                a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
                 .empty { color: #666; font-style: italic; margin-bottom: 20px; }
               </style>";
         $html .= "</head><body>";
