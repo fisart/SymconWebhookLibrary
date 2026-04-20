@@ -13,6 +13,8 @@ class WebhookLibrary extends IPSModule
         // Properties
         $this->RegisterPropertyBoolean('UsePasswordProtection', false);
         $this->RegisterPropertyInteger('SecretsManagerID', 0);
+        $this->RegisterVariableString('LibraryHtml', $this->Translate('Webhook Library'), '~HTMLBox', 0);
+        $this->DisableAction('LibraryHtml');
     }
 
     public function Destroy()
@@ -28,6 +30,9 @@ class WebhookLibrary extends IPSModule
 
         // Register the Webhook
         $this->RegisterHook('/hook/library');
+
+        // Update HTML visualization
+        $this->UpdateLibraryHtml();
     }
 
     protected function ProcessHookData()
@@ -55,17 +60,84 @@ class WebhookLibrary extends IPSModule
             }
         }
 
-        // 2. Retrieve WebHook Control instance
+        // Keep HTMLBox in sync when the page is opened via webhook
+        $this->UpdateLibraryHtml();
+
+        echo $this->BuildLibraryHtml(true);
+    }
+
+    private function UpdateLibraryHtml()
+    {
+        $html = $this->BuildLibraryHtml(false);
+        SetValueString($this->GetIDForIdent('LibraryHtml'), $html);
+    }
+
+    private function BuildLibraryHtml(bool $fullPage): string
+    {
+        $data = $this->GetHookLists();
+        $internalHooks = $data['internalHooks'];
+        $userHooks = $data['userHooks'];
+
+        $content = '';
+        $content .= "<style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f4f9; margin: 0; }
+                    h2, h3 { color: #333; }
+                    ul { list-style-type: none; padding: 0; margin: 0 0 20px 0; }
+                    li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
+                    li:hover { background: #e9ecef; }
+                    a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
+                    .empty { color: #666; font-style: italic; margin-bottom: 20px; }
+                </style>";
+
+        $content .= '<h2>Available Links</h2>';
+
+        $content .= '<h3>Internal WebHooks</h3>';
+        if (count($internalHooks) === 0) {
+            $content .= "<div class='empty'>No internal hooks found.</div>";
+        } else {
+            $content .= '<ul>';
+            foreach ($internalHooks as $entry) {
+                $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
+                $content .= '<li><a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer">' . $escapedUrl . '</a></li>';
+            }
+            $content .= '</ul>';
+        }
+
+        $content .= '<h3>Registered WebHooks</h3>';
+        if (count($userHooks) === 0) {
+            $content .= "<div class='empty'>No registered webhooks found.</div>";
+        } else {
+            $content .= '<ul>';
+            foreach ($userHooks as $entry) {
+                $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
+                $content .= '<li><a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer">' . $escapedUrl . '</a></li>';
+            }
+            $content .= '</ul>';
+        }
+
+        if ($fullPage) {
+            return '<!DOCTYPE html><html><head><title>Webhook Library</title><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>' . $content . '</body></html>';
+        }
+
+        return $content;
+    }
+
+    private function GetHookLists(): array
+    {
+        $userHooks = [];
+        $internalHooks = [];
+
         $ids = IPS_GetInstanceListByModuleID('{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}');
         if (count($ids) === 0) {
-            echo 'Error: WebHook Control instance not found.';
-            return;
+            return [
+                'internalHooks' => [],
+                'userHooks'     => []
+            ];
         }
 
         $webHookControlID = $ids[0];
 
-        // 3. Read normal user-defined hooks from the real Hooks property
-        $userHooks = [];
+        // User-defined hooks from property
         $hooksRaw = IPS_GetProperty($webHookControlID, 'Hooks');
         $hooks = json_decode($hooksRaw, true);
 
@@ -82,15 +154,14 @@ class WebhookLibrary extends IPSModule
 
                 $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
                 $userHooks[$url] = [
-                    'url' => $url,
+                    'url'  => $url,
                     'hook' => $hook,
-                    'row' => $row
+                    'row'  => $row
                 ];
             }
         }
 
-        // 4. Read internal hooks from the configuration form
-        $internalHooks = [];
+        // Internal hooks from configuration form
         $formRaw = IPS_GetConfigurationForm($webHookControlID);
         $form = json_decode($formRaw, true);
 
@@ -122,9 +193,9 @@ class WebhookLibrary extends IPSModule
 
                             $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
                             $internalHooks[$url] = [
-                                'url' => $url,
+                                'url'  => $url,
                                 'hook' => $hook,
-                                'row' => $row
+                                'row'  => $row
                             ];
                         }
                     }
@@ -143,50 +214,11 @@ class WebhookLibrary extends IPSModule
         ksort($internalHooks, SORT_NATURAL | SORT_FLAG_CASE);
         ksort($userHooks, SORT_NATURAL | SORT_FLAG_CASE);
 
-        // 5. Generate HTML Output
-        $html = "<!DOCTYPE html><html><head><title>Webhook Library</title>";
-        $html .= "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-        $html .= "<style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f4f9; }
-                h2, h3 { color: #333; }
-                ul { list-style-type: none; padding: 0; }
-                li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
-                li:hover { background: #e9ecef; }
-                a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
-                .empty { color: #666; font-style: italic; margin-bottom: 20px; }
-              </style>";
-        $html .= "</head><body>";
-        $html .= "<h2>Available Links</h2>";
-
-        $html .= "<h3>Internal WebHooks</h3>";
-        if (count($internalHooks) === 0) {
-            $html .= "<div class='empty'>No internal hooks found.</div>";
-        } else {
-            $html .= "<ul>";
-            foreach ($internalHooks as $entry) {
-                $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
-                $html .= "<li><a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedUrl . "</a></li>";
-            }
-            $html .= "</ul>";
-        }
-
-        $html .= "<h3>Registered WebHooks</h3>";
-        if (count($userHooks) === 0) {
-            $html .= "<div class='empty'>No registered webhooks found.</div>";
-        } else {
-            $html .= "<ul>";
-            foreach ($userHooks as $entry) {
-                $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
-                $html .= "<li><a href=\"" . $escapedUrl . "\" target=\"_blank\" rel=\"noopener noreferrer\">" . $escapedUrl . "</a></li>";
-            }
-            $html .= "</ul>";
-        }
-
-        $html .= "</body></html>";
-
-        echo $html;
+        return [
+            'internalHooks' => $internalHooks,
+            'userHooks'     => $userHooks
+        ];
     }
-
     private function RegisterHook($WebHook)
     {
         // Correct GUID for your system
