@@ -10,7 +10,6 @@ class WebhookLibrary extends IPSModule
         parent::Create();
 
         // Properties
-        // Properties
         $this->RegisterPropertyBoolean('UsePasswordProtection', false);
         $this->RegisterPropertyInteger('SecretsManagerID', 0);
         $this->RegisterVariableString('LibraryHtml', $this->Translate('Webhook Library'), '~HTMLBox', 0);
@@ -85,7 +84,8 @@ class WebhookLibrary extends IPSModule
                     ul { list-style-type: none; padding: 0; margin: 0 0 20px 0; }
                     li { background: #fff; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
                     li:hover { background: #e9ecef; }
-                    a { display: block; padding: 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
+                    a { display: block; padding: 15px 15px 4px 15px; text-decoration: none; color: #0078d7; font-weight: bold; }
+                    .target-name { display: block; padding: 0 15px 15px 15px; color: #666; font-size: 13px; }
                     .empty { color: #666; font-style: italic; margin-bottom: 20px; }
                 </style>";
 
@@ -98,7 +98,13 @@ class WebhookLibrary extends IPSModule
             $content .= '<ul>';
             foreach ($internalHooks as $entry) {
                 $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
-                $content .= '<li><a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer">' . $escapedUrl . '</a></li>';
+                $escapedTarget = htmlspecialchars((string)($entry['targetName'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+                $content .= '<li><a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer">' . $escapedUrl . '</a>';
+                if ($escapedTarget !== '') {
+                    $content .= '<span class="target-name">' . $escapedTarget . '</span>';
+                }
+                $content .= '</li>';
             }
             $content .= '</ul>';
         }
@@ -110,7 +116,13 @@ class WebhookLibrary extends IPSModule
             $content .= '<ul>';
             foreach ($userHooks as $entry) {
                 $escapedUrl = htmlspecialchars($entry['url'], ENT_QUOTES, 'UTF-8');
-                $content .= '<li><a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer">' . $escapedUrl . '</a></li>';
+                $escapedTarget = htmlspecialchars((string)($entry['targetName'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+                $content .= '<li><a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer">' . $escapedUrl . '</a>';
+                if ($escapedTarget !== '') {
+                    $content .= '<span class="target-name">' . $escapedTarget . '</span>';
+                }
+                $content .= '</li>';
             }
             $content .= '</ul>';
         }
@@ -153,10 +165,18 @@ class WebhookLibrary extends IPSModule
                 }
 
                 $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
+                $targetName = '';
+
+                // User-defined WebHook Control entries use TargetID.
+                if (isset($row['TargetID']) && is_numeric($row['TargetID'])) {
+                    $targetName = $this->GetObjectNameSafe((int)$row['TargetID']);
+                }
+
                 $userHooks[$url] = [
-                    'url'  => $url,
-                    'hook' => $hook,
-                    'row'  => $row
+                    'url'        => $url,
+                    'hook'       => $hook,
+                    'targetName' => $targetName,
+                    'row'        => $row
                 ];
             }
         }
@@ -193,9 +213,10 @@ class WebhookLibrary extends IPSModule
 
                             $url = (strpos($hook, '/') === 0) ? $hook : '/hook/' . ltrim($hook, '/');
                             $internalHooks[$url] = [
-                                'url'  => $url,
-                                'hook' => $hook,
-                                'row'  => $row
+                                'url'        => $url,
+                                'hook'       => $hook,
+                                'targetName' => $this->GetInternalTargetName($row),
+                                'row'        => $row
                             ];
                         }
                     }
@@ -219,6 +240,50 @@ class WebhookLibrary extends IPSModule
             'userHooks'     => $userHooks
         ];
     }
+
+    private function GetInternalTargetName(array $row): string
+    {
+        // Prefer names that WebHook Control already exposes in its form data.
+        foreach (['Instance', 'Script', 'Target', 'Object', 'Name'] as $field) {
+            if (isset($row[$field]) && is_string($row[$field])) {
+                $value = trim($row[$field]);
+                if ($value !== '') {
+                    return $value;
+                }
+            }
+        }
+
+        // Only use explicitly named object-ID fields as a fallback.
+        foreach (['TargetID', 'InstanceID', 'ScriptID', 'ObjectID'] as $field) {
+            if (isset($row[$field]) && is_numeric($row[$field])) {
+                $name = $this->GetObjectNameSafe((int)$row[$field]);
+                if ($name !== '') {
+                    return $name;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function GetObjectNameSafe(int $objectID): string
+    {
+        if ($objectID <= 0) {
+            return '';
+        }
+
+        try {
+            if (!IPS_ObjectExists($objectID)) {
+                return '';
+            }
+
+            return IPS_GetName($objectID);
+        } catch (Throwable $e) {
+            // Target-name display must never prevent the library from loading.
+            return '';
+        }
+    }
+
     private function RegisterHook($WebHook)
     {
         // Correct GUID for your system
